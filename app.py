@@ -7,11 +7,10 @@ from typing import List, Optional
 
 app = FastAPI()
 
-# Configuração robusta de caminhos para o Render
-base_dir = os.path.dirname(os.path.realpath(__file__))
+# Ajuste aqui: Usamos o caminho relativo simples para o Render
 templates = Jinja2Templates(directory="templates")
 
-# --- MODELOS DE DADOS (O que era struct no C++) ---
+# --- MODELOS DE DADOS ---
 class Autor(BaseModel):
     id: int
     nome: str
@@ -25,18 +24,15 @@ class Obra(BaseModel):
 
 # --- ROTAS ---
 
-# Rota Principal: Carrega a interface
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
+    # O arquivo index.html DEVE estar dentro da pasta /templates
     return templates.TemplateResponse("index.html", {"request": request})
 
-# Rota de API: Exemplo de processamento (Caso queira filtrar no servidor)
 @app.post("/relatorio")
 async def gerar_relatorio(obras: List[Obra]):
-    # Exemplo: Retorna obras ordenadas por título
     return sorted(obras, key=lambda x: x.titulo)
 
-# Se rodar localmente pelo terminal
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
