@@ -9,7 +9,7 @@ app = FastAPI()
 
 # Configuração robusta de caminhos para o Render
 base_dir = os.path.dirname(os.path.realpath(__file__))
-templates = Jinja2Templates(directory=os.path.join(base_dir, "templates"))
+templates = Jinja2Templates(directory="templates")
 
 # --- MODELOS DE DADOS (O que era struct no C++) ---
 class Autor(BaseModel):
