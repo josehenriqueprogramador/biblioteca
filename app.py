@@ -1,31 +1,42 @@
+import os
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 app = FastAPI()
 
-# Configuração de templates
-templates = Jinja2Templates(directory="templates")
+# Configuração robusta de caminhos para o Render
+base_dir = os.path.dirname(os.path.realpath(__file__))
+templates = Jinja2Templates(directory=os.path.join(base_dir, "templates"))
 
-@app.get("/", response_class=HTMLResponse)
-async def read_item(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+# --- MODELOS DE DADOS (O que era struct no C++) ---
+class Autor(BaseModel):
+    id: int
+    nome: str
+    nacionalidade: str
 
-# Opcional: Rota de API caso queira processar relatórios no servidor
 class Obra(BaseModel):
     isbn: str
     titulo: str
-    autor: str
-    status: str
+    autor_id: int
+    status: str = "LIVRE"
 
-@app.post("/processar-relatorio")
-async def processar(obras: List[Obra]):
-    # Exemplo de lógica: ordenar no servidor e devolver
+# --- ROTAS ---
+
+# Rota Principal: Carrega a interface
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+# Rota de API: Exemplo de processamento (Caso queira filtrar no servidor)
+@app.post("/relatorio")
+async def gerar_relatorio(obras: List[Obra]):
+    # Exemplo: Retorna obras ordenadas por título
     return sorted(obras, key=lambda x: x.titulo)
 
+# Se rodar localmente pelo terminal
 if __name__ == "__main__":
     import uvicorn
-#    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
