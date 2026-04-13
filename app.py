@@ -5,7 +5,7 @@ import json
 # Configuração da página
 st.set_page_config(page_title="Sistema de Biblioteca", layout="wide")
 
-# --- INICIALIZAÇÃO DO ESTADO ---
+# --- INICIALIZAÇÃO DO ESTADO (Persistência na Sessão) ---
 if 'autores' not in st.session_state:
     st.session_state.autores = []
 if 'obras' not in st.session_state:
@@ -13,138 +13,111 @@ if 'obras' not in st.session_state:
 
 st.title("📚 Biblioteca Digital - Gestão RotaFlex")
 
-# --- BARRA LATERAL: GESTÃO DE ARQUIVOS ---
+# --- BARRA LATERAL ---
 st.sidebar.header("⚙️ Gestão de Dados")
 
-# Botão para Baixar JSON
+# Download JSON
 data_to_save = {"autores": st.session_state.autores, "obras": st.session_state.obras}
 json_string = json.dumps(data_to_save, indent=4)
-st.sidebar.download_button(
-    label="📥 Baixar Backup (JSON)",
-    data=json_string,
-    file_name="biblioteca_backup.json",
-    mime="application/json"
-)
+st.sidebar.download_button(label="📥 Baixar Backup (JSON)", data=json_string, file_name="biblioteca.json", mime="application/json")
 
-# Botão para Carregar JSON
+# Upload JSON
 uploaded_file = st.sidebar.file_uploader("📤 Carregar Backup (JSON)", type="json")
-if uploaded_file is not None:
+if uploaded_file:
     content = json.load(uploaded_file)
     st.session_state.autores = content.get("autores", [])
     st.session_state.obras = content.get("obras", [])
-    st.sidebar.success("Dados carregados com sucesso!")
+    st.sidebar.success("Dados carregados!")
 
 st.sidebar.divider()
-opcao = st.sidebar.radio("Navegação:", 
-    ["Início", "Cadastrar Autor", "Cadastrar Obra", "Alugar Obra", "Devolver Obra", "Relatórios"])
+opcao = st.sidebar.radio("Navegação:", ["Início", "Cadastrar Autor", "Cadastrar Obra", "Alugar Obra", "Devolver Obra", "Relatórios"])
 
-# --- FUNÇÕES DE APOIO ---
+# --- FUNÇÕES ---
 def get_next_id(lista, campo="id"):
-    if not lista:
-        return 1
+    if not lista: return 1
     return max(item[campo] for item in lista) + 1
 
 # --- TELAS ---
 
 if opcao == "Início":
-    st.info("Sistema operacional. Utilize o menu lateral para gerenciar o acervo e carregar seus dados.")
-    col_m1, col_m2 = st.columns(2)
-    col_m1.metric("Autores Cadastrados", len(st.session_state.autores))
-    col_m2.metric("Obras no Acervo", len(st.session_state.obras))
+    st.info("Sistema Pronto. Carregue seu JSON para começar.")
+    st.metric("Obras no Acervo", len(st.session_state.obras))
 
 elif opcao == "Cadastrar Autor":
     st.header("📝 Novo Autor")
     prox_id = get_next_id(st.session_state.autores)
-    st.write(f"**ID Gerado:** {prox_id}")
-    
-    with st.form("form_autor"):
-        nome = st.text_input("Nome completo do Autor")
-        pais = st.text_input("País de Origem")
-        if st.form_submit_button("Salvar Registro"):
-            if nome and pais:
-                st.session_state.autores.append({"id": prox_id, "nome": nome, "pais": pais})
-                st.success(f"Autor {nome} registrado!")
-            else:
-                st.error("Preencha todos os campos.")
+    with st.form("f_autor"):
+        nome = st.text_input("Nome")
+        pais = st.text_input("País")
+        if st.form_submit_button("Salvar"):
+            st.session_state.autores.append({"id": prox_id, "nome": nome, "pais": pais})
+            st.success("Cadastrado!")
+            st.rerun()
 
 elif opcao == "Cadastrar Obra":
     st.header("📖 Nova Obra")
     if not st.session_state.autores:
-        st.warning("É necessário cadastrar ao menos um autor antes de registrar obras.")
+        st.warning("Cadastre um autor primeiro.")
     else:
-        prox_id_obra = get_next_id(st.session_state.obras, "id_obra")
-        st.write(f"**ID da Obra:** {prox_id_obra}")
-        with st.form("form_obra"):
-            titulo = st.text_input("Título da Obra")
+        prox_id_o = get_next_id(st.session_state.obras, "id_obra")
+        with st.form("f_obra"):
+            titulo = st.text_input("Título")
             isbn = st.text_input("ISBN")
-            lista_autores = {a['nome']: a['id'] for a in st.session_state.autores}
-            autor_nome = st.selectbox("Vincular Autor", list(lista_autores.keys()))
-            
-            if st.form_submit_button("Confirmar Cadastro"):
-                st.session_state.obras.append({
-                    "id_obra": prox_id_obra, 
-                    "titulo": titulo, 
-                    "isbn": isbn,
-                    "autor_id": lista_autores[autor_nome], 
-                    "status": "LIVRE"
-                })
-                st.success(f"Obra '{titulo}' adicionada ao catálogo!")
+            lista_a = {a['nome']: a['id'] for a in st.session_state.autores}
+            aut_sel = st.selectbox("Autor", list(lista_a.keys()))
+            if st.form_submit_button("Cadastrar"):
+                st.session_state.obras.append({"id_obra": prox_id_o, "titulo": titulo, "isbn": isbn, "autor_id": lista_a[aut_sel], "status": "LIVRE"})
+                st.success("Obra salva!")
+                st.rerun()
 
 elif opcao == "Alugar Obra":
-    st.header("🔑 Gestão de Aluguel")
-    obras_livres = [o for o in st.session_state.obras if o['status'] == "LIVRE"]
+    st.header("🔑 Alugar Obra")
+    # Pegamos apenas os títulos das obras que estão LIVRES
+    livres = [o['titulo'] for o in st.session_state.obras if o['status'] == "LIVRE"]
     
-    if not obras_livres:
-        st.info("Não existem obras disponíveis para novos aluguéis.")
+    if not livres:
+        st.warning("Não há obras disponíveis.")
     else:
-        with st.form("aluguel_confirm"):
-            obra_sel = st.selectbox("Escolha a obra para alugar:", [o['titulo'] for o in obras_livres])
-            if st.form_submit_button("Confirmar Saída"):
-                for o in st.session_state.obras:
-                    if o['titulo'] == obra_sel:
-                        o['status'] = "ALUGADA"
-                st.success(f"Status de '{obra_sel}' atualizado para ALUGADA.")
-                st.rerun()
+        obra_escolhida = st.selectbox("Selecione para alugar:", livres)
+        if st.button("Confirmar Aluguel"):
+            # Atualização direta no session_state
+            for i, obra in enumerate(st.session_state.obras):
+                if obra['titulo'] == obra_escolhida:
+                    st.session_state.obras[i]['status'] = "ALUGADA"
+                    st.success(f"Aluguel de '{obra_escolhida}' confirmado!")
+                    st.rerun() # Isso força a atualização do relatório na hora
 
 elif opcao == "Devolver Obra":
-    st.header("🔙 Gestão de Devolução")
-    obras_alugadas = [o for o in st.session_state.obras if o['status'] == "ALUGADA"]
+    st.header("🔙 Devolver Obra")
+    alugadas = [o['titulo'] for o in st.session_state.obras if o['status'] == "ALUGADA"]
     
-    if not obras_alugadas:
-        st.info("Nenhuma obra consta como alugada no sistema.")
+    if not alugadas:
+        st.info("Nenhuma obra alugada.")
     else:
-        with st.form("devolucao_confirm"):
-            obra_sel_dev = st.selectbox("Escolha a obra para devolução:", [o['titulo'] for o in obras_alugadas])
-            if st.form_submit_button("Confirmar Entrada"):
-                for o in st.session_state.obras:
-                    if o['titulo'] == obra_sel_dev:
-                        o['status'] = "LIVRE"
-                st.success(f"Obra '{obra_sel_dev}' retornou ao status LIVRE.")
-                st.rerun()
+        obra_devolucao = st.selectbox("Selecione para devolver:", alugadas)
+        if st.button("Confirmar Devolução"):
+            for i, obra in enumerate(st.session_state.obras):
+                if obra['titulo'] == obra_devolucao:
+                    st.session_state.obras[i]['status'] = "LIVRE"
+                    st.success(f"'{obra_devolucao}' devolvida!")
+                    st.rerun()
 
 elif opcao == "Relatórios":
-    st.header("📊 Painel de Relatórios")
-    tab_geral, tab_pais = st.tabs(["📋 Relatório Geral", "🌍 Filtrar por País"])
+    st.header("📊 Relatórios")
+    t1, t2 = st.tabs(["Geral", "Por País"])
     
     if not st.session_state.obras:
-        st.write("A base de dados está vazia.")
+        st.write("Sem dados.")
     else:
         df_obras = pd.DataFrame(st.session_state.obras)
         df_autores = pd.DataFrame(st.session_state.autores)
-
-        with tab_geral:
-            st.subheader("Visão Completa do Acervo")
+        
+        with t1:
             st.dataframe(df_obras, use_container_width=True)
-
-        with tab_pais:
-            st.subheader("Filtro Geográfico")
+            
+        with t2:
             if not df_autores.empty:
-                # Merge para trazer o nome do país para o dataframe de obras
-                df_completo = pd.merge(df_obras, df_autores, left_on="autor_id", right_on="id")
-                paises_disponiveis = df_completo['pais'].unique()
-                pais_escolhido = st.selectbox("Selecione o País:", paises_disponiveis)
-                
-                filtro = df_completo[df_completo['pais'] == pais_escolhido]
-                st.table(filtro[['id_obra', 'titulo', 'status', 'pais']])
-            else:
-                st.write("Cadastre autores com países para habilitar este filtro.")
+                df_m = pd.merge(df_obras, df_autores, left_on="autor_id", right_on="id")
+                p_lista = df_m['pais'].unique()
+                p_sel = st.selectbox("Filtrar por País:", p_lista)
+                st.table(df_m[df_m['pais'] == p_sel][['titulo', 'status', 'pais']])
